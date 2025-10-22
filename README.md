@@ -285,7 +285,12 @@ MickTrace solves these fundamental architectural problems through intelligent de
 
 ## 🏢 Cloud Platform Integration
 
+MickTrace provides native, high-performance handlers for major cloud providers, ensuring your logs are delivered reliably and efficiently without complex setup.
+
 ### **[AWS](https://aws.amazon.com/) CloudWatch**
+
+[AWS CloudWatch](https://aws.amazon.com/cloudwatch/) is a monitoring and observability service from Amazon Web Services. The `cloudwatch` handler sends structured logs directly to CloudWatch Logs, supporting asynchronous batching to minimize performance impact and automatic retries for reliability. This is ideal for applications running on EC2, ECS, Lambda, or any AWS service.
+
 ```python
 import micktrace
 
@@ -304,6 +309,9 @@ logger.info("Lambda function executed", duration_ms=150, memory_used=64)
 ```
 
 ### **[Azure](https://azure.microsoft.com/) Monitor**
+
+[Azure Monitor](https://azure.microsoft.com/en-us/services/monitor/) is a comprehensive solution for collecting, analyzing, and acting on telemetry from your cloud and on-premises environments. The `azure` handler integrates with Azure Monitor by sending log data to its Application Insights service. It uses a connection string for authentication and sends structured events, allowing you to query and visualize logs within the Azure Portal.
+
 ```python
 import micktrace
 
@@ -320,6 +328,9 @@ logger.info("Azure function completed", execution_time=200)
 ```
 
 ### **[Google Cloud](https://cloud.google.com/) Logging**
+
+[Google Cloud Logging](https://cloud.google.com/logging) provides centralized log management for applications and services running on Google Cloud. The `gcp` handler formats logs into the structured JSON payload expected by Google Cloud's logging agent and API. This ensures logs are correctly parsed with proper severity levels and metadata, making them searchable and ready for analysis in the Logs Explorer.
+
 ```python
 import micktrace
 
@@ -355,7 +366,12 @@ micktrace.configure(
 
 ## 📈 Analytics & Monitoring Integration
 
+Integrate seamlessly with leading analytics and monitoring platforms to gain deeper insights into your application's behavior.
+
 ### **[Datadog](https://www.datadoghq.com/) Integration**
+
+[Datadog](https://docs.datadoghq.com/logs/) is a monitoring and analytics platform for cloud-scale applications. The `datadog` handler sends logs directly to the Datadog API, automatically enriching them with service, environment, and other metadata. This enables powerful search, visualization, and alerting capabilities within your Datadog dashboards.
+
 ```python
 import micktrace
 
@@ -374,6 +390,9 @@ logger.info("Payment processed", amount=100.0, currency="USD", customer_id=12345
 ```
 
 ### **[New Relic](https://newrelic.com/) Integration**
+
+[New Relic](https://docs.newrelic.com/docs/logs/) is a full-stack observability platform. The `newrelic` handler forwards your logs to the New Relic Logs API, allowing you to correlate log data with application performance metrics and traces. This provides a unified view of your application's health and performance.
+
 ```python
 import micktrace
 
@@ -391,6 +410,9 @@ logger.info("Database query", table="users", duration_ms=45, rows_returned=150)
 ```
 
 ### **[Elastic Stack](https://www.elastic.co/) Integration**
+
+The [Elastic Stack](https://www.elastic.co/elastic-stack) (formerly ELK Stack) is a popular open-source solution for search, logging, and analytics, centered around Elasticsearch. The `elasticsearch` handler sends structured JSON logs directly to an Elasticsearch cluster, making them immediately available for search and visualization in Kibana.
+
 ```python
 import micktrace
 

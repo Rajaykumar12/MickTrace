@@ -176,54 +176,65 @@ pip install micktrace[all]
 
 ### **Instant Logging (Zero Config)**
 ```python
-import micktrace
+from micktrace import MickTracer
 
-logger = micktrace.get_logger(__name__)
+# The tracer is your main entry point for tracing and logging
+tracer = MickTracer(service_name="my-awesome-app")
+
+# Get a logger from the tracer instance
+logger = tracer.get_logger(__name__)
 logger.info("Application started", version="1.0.0", env="production")
 ```
 
-### **Structured Logging**
+### **Structured Logging with Context**
 ```python
-import micktrace
+from micktrace import MickTracer
 
-logger = micktrace.get_logger("api")
+tracer = MickTracer(service_name="api")
 
-# Automatic structured output
-logger.info("User login", 
-           user_id=12345, 
-           email="user@example.com",
-           ip_address="192.168.1.1",
-           success=True)
+# Use a span to create a context for an operation
+with tracer.span(name="user.login") as span:
+    # Add attributes to the span for context
+    span.set_attribute("user_id", 12345)
+    span.set_attribute("ip_address", "192.168.1.1")
+
+    # Logs automatically include span context
+    logger = tracer.get_logger("api.auth")
+    logger.info("User login attempt", email="user@example.com", success=True)
 ```
 
 ### **Async Context Propagation**
 ```python
 import asyncio
-import micktrace
+from micktrace import MickTracer
+
+tracer = MickTracer(service_name="request-handler")
 
 async def handle_request():
-    async with micktrace.acontext(request_id="req_123", user_id=456):
-        logger = micktrace.get_logger("handler")
+    # Use an async span for tracing async operations
+    async with tracer.span(name="handle_request", attributes={"request_id": "req_123", "user_id": 456}) as span:
+        logger = tracer.get_logger("handler")
         logger.info("Processing request")
         
-        await process_data()  # Context automatically propagated
+        await process_data()  # Context is automatically propagated
         
         logger.info("Request completed")
 
 async def process_data():
-    logger = micktrace.get_logger("processor")
+    # No need to pass context manually
+    logger = tracer.get_logger("processor")
     logger.info("Processing data")  # Includes request_id and user_id automatically
 ```
 
 ### **Application Configuration**
 ```python
-import micktrace
+from micktrace import MickTracer
 
-# Configure for your application
-micktrace.configure(
+# Configure the tracer for your application
+tracer = MickTracer(
+    service_name="my-app",
     level="INFO",
     format="json",
-    service="my-app",
     version="1.0.0",
     environment="production",
     handlers=[
@@ -464,106 +475,152 @@ logger.info("Search query", query="python logging", results=1250, response_time_
 MickTrace is perfect for web applications, providing structured, context-rich logs for every request with minimal setup.
 
 #### **Flask Example**
-The following example shows how to use a context manager to automatically add request information to all logs within a Flask view.
+The following example shows how to use a middleware-like pattern with a span to automatically trace requests and add context to logs.
 
 ```python
-import micktrace
+from micktrace import MickTracer
 from flask import Flask, request
 
 app = Flask(__name__)
 
-micktrace.configure(level="INFO", format="json", service="flask-api")
+# Initialize the tracer for your Flask application
+tracer = MickTracer(service_name="flask-api", level="INFO", format="json")
+
+@app.before_request
+def start_trace():
+    # Start a span for each incoming request
+    span = tracer.start_span(name=f"{request.method} {request.path}")
+    span.set_attribute("http.method", request.method)
+    span.set_attribute("http.url", request.url)
+    span.set_attribute("http.headers.x_request_id", request.headers.get("X-Request-ID"))
+    # Store the span in the request context
+    request.environ["micktrace_span"] = span
+
+@app.after_request
+def end_trace(response):
+    # Retrieve the span and finish it
+    span = request.environ.get("micktrace_span")
+    if span:
+        span.set_attribute("http.status_code", response.status_code)
+        span.finish()
+    return response
 
 @app.route("/api/users", methods=["POST"])
 def create_user():
-    # Use a context to automatically add request details to logs
-    with micktrace.context(
-        request_id=request.headers.get("X-Request-ID"),
-        endpoint="/api/users",
-        method="POST"
-    ):
-        logger = micktrace.get_logger("api.users")
-        logger.info("User creation request received")
-        
-        # ... business logic to create user ...
-        user_id = 99
-        
-        logger.info("User created successfully", user_id=user_id)
-        return {"status": "success", "user_id": user_id}
+    # No manual context needed; logs automatically pick up span context
+    logger = tracer.get_logger("api.users")
+    logger.info("User creation request received")
+    
+    # ... business logic to create user ...
+    user_id = 99
+    
+    logger.info("User created successfully", user_id=user_id)
+    return {"status": "success", "user_id": user_id}
 ```
 **Example Log Output:**
 ```json
-{"timestamp": "2025-10-22T10:30:15.123Z", "level": "INFO", "message": "User creation request received", "logger": "api.users", "service": "flask-api", "request_id": "xyz-789", "endpoint": "/api/users", "method": "POST"}
-{"timestamp": "2025-10-22T10:30:15.234Z", "level": "INFO", "message": "User created successfully", "logger": "api.users", "service": "flask-api", "request_id": "xyz-789", "endpoint": "/api/users", "method": "POST", "user_id": 99}
+{"timestamp": "2025-10-22T10:30:15.123Z", "level": "INFO", "message": "User creation request received", "logger": "api.users", "service": "flask-api", "trace_id": "...", "span_id": "...", "http.method": "POST", "http.url": "http://localhost/api/users", "http.headers.x_request_id": "xyz-789"}
+{"timestamp": "2025-10-22T10:30:15.234Z", "level": "INFO", "message": "User created successfully", "logger": "api.users", "service": "flask-api", "trace_id": "...", "span_id": "...", "http.method": "POST", "http.url": "http://localhost/api/users", "http.headers.x_request_id": "xyz-789", "user_id": 99}
 ```
 
 #### **FastAPI Example**
 For async frameworks like FastAPI, middleware is the most efficient way to trace all incoming requests automatically.
 
 ```python
-import micktrace
+from micktrace import MickTracer
 from fastapi import FastAPI, Request
 
 app = FastAPI()
-micktrace.configure(level="INFO", format="json", service="fastapi-service")
-logger = micktrace.get_logger("fastapi.middleware")
+
+# Initialize the tracer for your FastAPI application
+tracer = MickTracer(service_name="fastapi-service", level="INFO", format="json")
+logger = tracer.get_logger("fastapi.middleware")
 
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
-    # Automatically trace every request with a context
-    async with micktrace.acontext(path=request.url.path, method=request.method):
+    # Use an async span to automatically trace every request
+    async with tracer.span(name=f"{request.method} {request.url.path}") as span:
+        span.set_attribute("http.method", request.method)
+        span.set_attribute("http.url", str(request.url))
+        
         logger.info("Request started")
         response = await call_next(request)
+        
+        span.set_attribute("http.status_code", response.status_code)
         logger.info("Request finished", status_code=response.status_code)
         return response
 
 @app.get("/items/{item_id}")
 async def read_item(item_id: int):
+    # Logs inside the endpoint will automatically have the request's trace context
+    tracer.get_logger("api.items").info(f"Reading item {item_id}")
     return {"item_id": item_id}
 ```
 **Example Log Output (for a request to `/items/42`):**
 ```json
-{"timestamp": "2025-10-22T10:31:05.500Z", "level": "INFO", "message": "Request started", "logger": "fastapi.middleware", "service": "fastapi-service", "path": "/items/42", "method": "GET"}
-{"timestamp": "2025-10-22T10:31:05.550Z", "level": "INFO", "message": "Request finished", "logger": "fastapi.middleware", "service": "fastapi-service", "path": "/items/42", "method": "GET", "status_code": 200}
+{"timestamp": "2025-10-22T10:31:05.500Z", "level": "INFO", "message": "Request started", "logger": "fastapi.middleware", "service": "fastapi-service", "trace_id": "...", "span_id": "...", "http.method": "GET", "http.url": "http://.../items/42"}
+{"timestamp": "2025-10-22T10:31:05.525Z", "level": "INFO", "message": "Reading item 42", "logger": "api.items", "service": "fastapi-service", "trace_id": "...", "span_id": "...", "http.method": "GET", "http.url": "http://.../items/42"}
+{"timestamp": "2025-10-22T10:31:05.550Z", "level": "INFO", "message": "Request finished", "logger": "fastapi.middleware", "service": "fastapi-service", "trace_id": "...", "span_id": "...", "http.method": "GET", "http.url": "http://.../items/42", "status_code": 200}
 ```
 
 #### **Django Example**
-A simple Django middleware can provide automatic, structured logging for the entire application without modifying individual views.
+A simple Django middleware can provide automatic, structured tracing and logging for the entire application.
 
 ```python
 # In myproject/middleware.py
-import micktrace
+from micktrace import MickTracer
 
-micktrace.configure(level="INFO", format="json", service="django-app")
-logger = micktrace.get_logger("django.request")
+# Initialize the tracer once for the application
+tracer = MickTracer(service_name="django-app", level="INFO", format="json")
+logger = tracer.get_logger("django.request")
 
-class MickTraceLoggingMiddleware:
+class MickTraceMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
 
     def __call__(self, request):
-        # Bind request info to the context for all subsequent logs
-        with micktrace.context(path=request.path, method=request.method):
+        # Create a span to trace the synchronous request
+        with tracer.span(name=f"{request.method} {request.path}") as span:
+            span.set_attribute("http.method", request.method)
+            span.set_attribute("http.path", request.path)
             logger.info("Request processing started")
+            
             response = self.get_response(request)
+            
+            span.set_attribute("http.status_code", response.status_code)
+            logger.info("Request processing finished", status_code=response.status_code)
+            return response
+
+    async def __acall__(self, request):
+        # Create an async span to trace asynchronous requests
+        async with tracer.span(name=f"{request.method} {request.path}") as span:
+            span.set_attribute("http.method", request.method)
+            span.set_attribute("http.path", request.path)
+            logger.info("Request processing started")
+
+            response = await self.get_response(request)
+
+            span.set_attribute("http.status_code", response.status_code)
             logger.info("Request processing finished", status_code=response.status_code)
             return response
 ```
 **Example Log Output (for a request to `/admin/`):**
 ```json
-{"timestamp": "2025-10-22T10:32:10.800Z", "level": "INFO", "message": "Request processing started", "logger": "django.request", "service": "django-app", "path": "/admin/", "method": "GET"}
-{"timestamp": "2025-10-22T10:32:10.950Z", "level": "INFO", "message": "Request processing finished", "logger": "django.request", "service": "django-app", "path": "/admin/", "method": "GET", "status_code": 302}
+{"timestamp": "2025-10-22T10:32:10.800Z", "level": "INFO", "message": "Request processing started", "logger": "django.request", "service": "django-app", "trace_id": "...", "span_id": "...", "http.method": "GET", "http.path": "/admin/"}
+{"timestamp": "2025-10-22T10:32:10.950Z", "level": "INFO", "message": "Request processing finished", "logger": "django.request", "service": "django-app", "trace_id": "...", "span_id": "...", "http.method": "GET", "http.path": "/admin/", "status_code": 302}
 ```
 
 ### **Microservices**
 ```python
-import micktrace
+from micktrace import MickTracer
 import asyncio
+
+tracer = MickTracer()
 
 # Service A
 async def service_a_handler(trace_id: str):
-    async with micktrace.acontext(trace_id=trace_id, service="service-a"):
-        logger = micktrace.get_logger("service-a")
+    async with tracer.span(name="service-a.handler", attributes={"trace_id": trace_id, "service": "service-a"}) as span:
+        logger = tracer.get_logger("service-a")
         logger.info("Processing request in service A")
         
         # Call service B
@@ -574,8 +631,8 @@ async def service_a_handler(trace_id: str):
 
 # Service B  
 async def service_b_handler(trace_id: str):
-    async with micktrace.acontext(trace_id=trace_id, service="service-b"):
-        logger = micktrace.get_logger("service-b")
+    async with tracer.span(name="service-b.handler", attributes={"trace_id": trace_id, "service": "service-b"}) as span:
+        logger = tracer.get_logger("service-b")
         logger.info("Processing request in service B")
         
         # Business logic

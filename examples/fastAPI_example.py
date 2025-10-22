@@ -6,7 +6,7 @@
 # 2. Run the server: uvicorn examples.fastapi_example:app --reload
 # 3. Open your browser and navigate to http://127.0.0.1:8000/ or http://127.0.0.1:8000/items/42
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from micktrace import MickTracer
 import time
 
@@ -22,12 +22,12 @@ app = FastAPI()
 # and every response before it is sent to the client. This is an efficient way
 # to trace all requests to your application without decorating each endpoint individually.
 @app.middleware("http")
-async def trace_requests(request, call_next):
+async def trace_requests(request: Request, call_next):
     """
     This middleware function creates a span for each incoming request.
     """
     # Start a new span for the incoming request.
-    with tracer.span(name=f"{request.method} {request.url.path}") as span:
+    async with tracer.span(name=f"{request.method} {request.url.path}") as span:
         # Add relevant attributes to the span for context.
         span.set_attribute("http.method", request.method)
         span.set_attribute("http.url", str(request.url))

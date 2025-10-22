@@ -29,6 +29,9 @@
 # --- Example Code ---
 
 from micktrace import MickTracer
+from django.urls import path
+from django.http import HttpResponse, JsonResponse
+import asyncio
 
 # 1. Initialize the tracer
 # This should be done once when your application loads. A good place for this
@@ -40,16 +43,23 @@ class MickTraceMiddleware:
     Django middleware to trace incoming HTTP requests.
     This middleware creates a span for each request, measures its duration,
     and captures relevant data like the URL and status code.
+    It supports both synchronous and asynchronous views.
     """
+
     def __init__(self, get_response):
         """
         This is called once by Django when the server starts.
         """
         self.get_response = get_response
+        # Differentiate between sync and async capable middleware
+        if asyncio.iscoroutinefunction(self.get_response):
+            self.async_capable = True
+        else:
+            self.async_capable = False
 
     def __call__(self, request):
         """
-        This method is called for every request that Django handles.
+        This method is called for synchronous requests.
         """
         # 2. Start a span for the incoming request.
         # The 'with' statement ensures the span is always finished correctly.
@@ -59,15 +69,30 @@ class MickTraceMiddleware:
             span.set_attribute("http.method", request.method)
             span.set_attribute("http.url", request.build_absolute_uri())
             span.set_attribute("http.path", request.path)
-            
+
             # Let Django continue processing the request to get the response from the view.
             response = self.get_response(request)
-            
+
             # 3. Add response information to the span before it's finished.
             span.set_attribute("http.status_code", response.status_code)
-            
+
             # The span is automatically finished when the 'with' block exits.
             return response
+
+    async def __acall__(self, request):
+        """
+        This method is called for asynchronous requests.
+        """
+        async with tracer.span(name=f"{request.method} {request.path}") as span:
+            span.set_attribute("http.method", request.method)
+            span.set_attribute("http.url", request.build_absolute_uri())
+            span.set_attribute("http.path", request.path)
+
+            response = await self.get_response(request)
+
+            span.set_attribute("http.status_code", response.status_code)
+            return response
+
 
 # --- Example of a view (this would typically be in a `views.py` file) ---
 #

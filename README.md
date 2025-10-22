@@ -235,12 +235,9 @@ tracer = MickTracer(
     service_name="my-app",
     level="INFO",
     format="json",
-    version="1.0.0",
-    environment="production",
     handlers=[
         {"type": "console"},
-        {"type": "file", "config": {"path": "app.log"}},
-        {"type": "cloudwatch", "config": {"log_group": "my-app"}}
+        {"type": "file", "config": {"path": "app.log"}}
     ]
 )
 ```
@@ -329,19 +326,21 @@ MickTrace provides native, high-performance handlers for major cloud providers, 
 [AWS CloudWatch](https://aws.amazon.com/cloudwatch/) is a monitoring and observability service from Amazon Web Services. The `cloudwatch` handler sends structured logs directly to CloudWatch Logs, supporting asynchronous batching to minimize performance impact and automatic retries for reliability. This is ideal for applications running on EC2, ECS, Lambda, or any AWS service.
 
 ```python
-import micktrace
+from micktrace import MickTracer
 
-micktrace.configure(
+tracer = MickTracer(
+    service_name="lambda-processor",
     level="INFO",
     handlers=[{
         "type": "cloudwatch",
-        "log_group_name": "my-application",
-        "log_stream_name": "production",
-        "region": "us-east-1"
+        "config": {
+            "log_group": "my-app-logs",
+            "log_stream": "my-app-stream-1"
+        }
     }]
 )
 
-logger = micktrace.get_logger(__name__)
+logger = tracer.get_logger(__name__)
 logger.info("Lambda function executed", duration_ms=150, memory_used=64)
 ```
 
@@ -350,17 +349,22 @@ logger.info("Lambda function executed", duration_ms=150, memory_used=64)
 [Azure Monitor](https://azure.microsoft.com/en-us/services/monitor/) is a comprehensive solution for collecting, analyzing, and acting on telemetry from your cloud and on-premises environments. The `azure` handler integrates with Azure Monitor by sending log data to its Application Insights service. It uses a connection string for authentication and sends structured events, allowing you to query and visualize logs within the Azure Portal.
 
 ```python
-import micktrace
+from micktrace import MickTracer
+import os
 
-micktrace.configure(
+# Best practice: load connection string from environment variables
+AZURE_CONN_STRING = os.environ.get("APPLICATIONINSIGHTS_CONNECTION_STRING")
+
+tracer = MickTracer(
+    service_name="azure-worker",
     level="INFO", 
     handlers=[{
         "type": "azure",
-        "connection_string": "InstrumentationKey=your-key"
+        "config": {"connection_string": AZURE_CONN_STRING}
     }]
 )
 
-logger = micktrace.get_logger(__name__)
+logger = tracer.get_logger(__name__)
 logger.info("Azure function completed", execution_time=200)
 ```
 
@@ -369,32 +373,31 @@ logger.info("Azure function completed", execution_time=200)
 [Google Cloud Logging](https://cloud.google.com/logging) provides centralized log management for applications and services running on Google Cloud. The `gcp` handler formats logs into the structured JSON payload expected by Google Cloud's logging agent and API. This ensures logs are correctly parsed with proper severity levels and metadata, making them searchable and ready for analysis in the Logs Explorer.
 
 ```python
-import micktrace
+from micktrace import MickTracer
 
-micktrace.configure(
+tracer = MickTracer(
+    service_name="gcp-service",
     level="INFO",
-    handlers=[{
-        "type": "gcp",
-        "project_id": "my-gcp-project",
-        "log_name": "my-app-log"
-    }]
+    handlers=[{"type": "gcp"}]
 )
 
-logger = micktrace.get_logger(__name__)
+logger = tracer.get_logger(__name__)
 logger.info("GCP service call", service="storage", operation="upload")
 ```
 
 ### **Multi-Platform Setup**
 ```python
-import micktrace
+from micktrace import MickTracer
+import os
 
-micktrace.configure(
+tracer = MickTracer(
+    service_name="multi-cloud-app",
     level="INFO",
     handlers=[
-        {"type": "console"},  # Development
-        {"type": "cloudwatch", "config": {"log_group": "prod-logs"}},  # AWS
-        {"type": "azure", "config": {"connection_string": "..."}},     # Azure
-        {"type": "file", "config": {"path": "/var/log/app.log"}}       # Local
+        {"type": "console"},
+        {"type": "aws", "config": {"log_group": "aws-log-group"}},
+        {"type": "gcp"},
+        {"type": "azure", "config": {"connection_string": os.environ.get("AZURE_CONN_STRING")}}
     ]
 )
 ```

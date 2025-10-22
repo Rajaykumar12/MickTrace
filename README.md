@@ -1,11 +1,16 @@
 # MickTrace - Engineered for Logging Excellence
 **Modern Python logging library designed for production applications and libraries.** Built with async-first architecture, structured logging, and zero-configuration philosophy.
 
-[![Python Version](https://img.shields.io/pypi/pyversions/micktrace.svg)](https://pypi.org/project/micktrace/)
+[![Build Status](https://github.com/ajayagrawalgit/MickTrace/actions/workflows/ci.yml/badge.svg)](https://github.com/ajayagrawalgit/MickTrace/actions)
+[![codecov](https://codecov.io/gh/ajayagrawalgit/MickTrace/graph/badge.svg)](https://codecov.io/gh/ajayagrawalgit/MickTrace)
 [![PyPI Version](https://img.shields.io/pypi/v/micktrace.svg)](https://pypi.org/project/micktrace/)
-[![License](https://img.shields.io/pypi/l/micktrace.svg)](https://github.com/ajayagrawalgit/MickTrace/blob/main/LICENSE)
+[![Python Version](https://img.shields.io/pypi/pyversions/micktrace.svg)](https://pypi.org/project/micktrace/)
 [![Downloads](https://img.shields.io/pypi/dm/micktrace.svg)](https://pypi.org/project/micktrace/)
 [![GitHub Stars](https://img.shields.io/github/stars/ajayagrawalgit/MickTrace.svg)](https://github.com/ajayagrawalgit/MickTrace)
+[![License: MIT](https://img.shields.io/pypi/l/micktrace.svg)](https://github.com/ajayagrawalgit/MickTrace/blob/main/LICENSE)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![Checked with mypy](http://www.mypy-lang.org/static/mypy_badge.svg)](http://mypy-lang.org/)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
 MickTrace is the world's most advanced and high-performance Python logging library, engineered from the ground up to eliminate every pain point developers face with application, cloud, and library logging. Combining zero-configuration simplicity with production-grade features, MickTrace delivers blazing-fast async-native dispatch, seamless structured logging, automatic sensitive data masking, and native integrations with all major cloud platforms—including [AWS](https://aws.amazon.com/), [GCP](https://cloud.google.com/), [Azure](https://azure.microsoft.com/), and [Datadog](https://www.datadoghq.com/)—ensuring effortless scalability, security, and observability for projects of any size. Trusted by top engineering teams, battle-tested in real-world scenarios, and backed by comprehensive research, MickTrace is the definitive logging solution that empowers you to build, debug, and scale Python applications with absolute confidence.
 
@@ -166,6 +171,7 @@ pip install micktrace[all]
 
 ---
 
+
 ## ⚡ Quick Start
 
 ### **Instant Logging (Zero Config)**
@@ -261,6 +267,7 @@ Research shows that in high-throughput production systems:
 MickTrace solves these fundamental architectural problems through intelligent design.
 
 ---
+
 
 ## 🌟 Key Features
 

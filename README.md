@@ -413,19 +413,19 @@ Integrate seamlessly with leading analytics and monitoring platforms to gain dee
 [Datadog](https://docs.datadoghq.com/logs/) is a monitoring and analytics platform for cloud-scale applications. The `datadog` handler sends logs directly to the Datadog API, automatically enriching them with service, environment, and other metadata. This enables powerful search, visualization, and alerting capabilities within your Datadog dashboards.
 
 ```python
-import micktrace
+from micktrace import MickTracer
 
-micktrace.configure(
+tracer = MickTracer(
+    service_name="my-service",
+    environment="production",
     level="INFO",
     handlers=[{
         "type": "datadog",
-        "api_key": "your-api-key",
-        "service": "my-service", 
-        "env": "production"
+        "config": {"api_key": "your-api-key"}
     }]
 )
 
-logger = micktrace.get_logger(__name__)
+logger = tracer.get_logger(__name__)
 logger.info("Payment processed", amount=100.0, currency="USD", customer_id=12345)
 ```
 
@@ -434,18 +434,18 @@ logger.info("Payment processed", amount=100.0, currency="USD", customer_id=12345
 [New Relic](https://docs.newrelic.com/docs/logs/) is a full-stack observability platform. The `newrelic` handler forwards your logs to the New Relic Logs API, allowing you to correlate log data with application performance metrics and traces. This provides a unified view of your application's health and performance.
 
 ```python
-import micktrace
+from micktrace import MickTracer
 
-micktrace.configure(
+tracer = MickTracer(
+    service_name="my-application",
     level="INFO",
     handlers=[{
         "type": "newrelic",
-        "license_key": "your-license-key",
-        "app_name": "my-application"
+        "config": {"license_key": "your-license-key"}
     }]
 )
 
-logger = micktrace.get_logger(__name__)
+logger = tracer.get_logger(__name__)
 logger.info("Database query", table="users", duration_ms=45, rows_returned=150)
 ```
 
@@ -454,18 +454,21 @@ logger.info("Database query", table="users", duration_ms=45, rows_returned=150)
 The [Elastic Stack](https://www.elastic.co/elastic-stack) (formerly ELK Stack) is a popular open-source solution for search, logging, and analytics, centered around Elasticsearch. The `elasticsearch` handler sends structured JSON logs directly to an Elasticsearch cluster, making them immediately available for search and visualization in Kibana.
 
 ```python
-import micktrace
+from micktrace import MickTracer
 
-micktrace.configure(
+tracer = MickTracer(
+    service_name="application-logs",
     level="INFO",
     handlers=[{
         "type": "elasticsearch",
-        "hosts": ["localhost:9200"],
-        "index": "application-logs"
+        "config": {
+            "hosts": ["localhost:9200"],
+            "index": "application-logs"
+        }
     }]
 )
 
-logger = micktrace.get_logger(__name__)
+logger = tracer.get_logger(__name__)
 logger.info("Search query", query="python logging", results=1250, response_time_ms=23)
 ```
 
@@ -647,26 +650,28 @@ async def service_b_handler(trace_id: str):
 
 ### **Data Processing**
 ```python
-import micktrace
+from micktrace import MickTracer
 
-logger = micktrace.get_logger("data-processor")
+tracer = MickTracer(service_name="data-processor")
+logger = tracer.get_logger("data-processor")
 
 def process_batch(batch_id: str, items: list):
-    with micktrace.context(batch_id=batch_id, batch_size=len(items)):
+    with tracer.span(name="process_batch", attributes={"batch_id": batch_id, "batch_size": len(items)}) as span:
         logger.info("Batch processing started")
         
         processed = 0
         failed = 0
         
         for item in items:
-            item_logger = logger.bind(item_id=item["id"])
-            try:
-                process_item(item)
-                item_logger.info("Item processed successfully")
-                processed += 1
-            except Exception as e:
-                item_logger.error("Item processing failed", error=str(e))
-                failed += 1
+            with tracer.span(name="process_item", attributes={"item_id": item["id"]}) as item_span:
+                try:
+                    # Business logic for processing a single item
+                    logger.info("Item processed successfully")
+                    processed += 1
+                except Exception as e:
+                    logger.error("Item processing failed", error=str(e))
+                    item_span.set_status("ERROR", description=str(e))
+                    failed += 1
         
         logger.info("Batch processing completed", 
                    processed=processed, 
@@ -677,23 +682,24 @@ def process_batch(batch_id: str, items: list):
 ### **Library Development**
 ```python
 # Your library code
-import micktrace
+from micktrace import MickTracer
 
 class MyLibrary:
     def __init__(self):
-        # Library gets its own logger - no global state pollution
-        self.logger = micktrace.get_logger("my_library")
+        # Library gets its own tracer - no global state pollution
+        self.tracer = MickTracer(service_name="my_library")
+        self.logger = self.tracer.get_logger("my_library")
     
     def process_data(self, data):
-        self.logger.debug("Processing data", data_size=len(data))
-        
-        # Your processing logic
-        result = self._internal_process(data)
-        
-        self.logger.info("Data processed successfully", 
-                        input_size=len(data),
-                        output_size=len(result))
-        return result
+        with self.tracer.span(name="process_data", attributes={"data_size": len(data)}) as span:
+            self.logger.debug("Processing data")
+            
+            # Your processing logic
+            result = self._internal_process(data)
+            
+            span.set_attribute("output_size", len(result))
+            self.logger.info("Data processed successfully")
+            return result
     
     def _internal_process(self, data):
         # Library logging works regardless of application configuration
@@ -701,15 +707,17 @@ class MyLibrary:
         return data.upper()
 
 # Application using your library
-import micktrace
+from micktrace import MickTracer
 from my_library import MyLibrary
 
-# Application configures logging
-micktrace.configure(level="INFO", format="json")
+# Application configures its own tracer
+app_tracer = MickTracer(service_name="my-app", level="INFO", format="json")
+app_logger = app_tracer.get_logger("my-app")
 
-# Library logging automatically follows application configuration
+# Library logging automatically works without interference
 lib = MyLibrary()
 result = lib.process_data("hello world")
+app_logger.info("Library call finished", result=result)
 ```
 
 ---
@@ -719,44 +727,50 @@ result = lib.process_data("hello world")
 ### **Environment-Based Configuration**
 ```python
 import os
-import micktrace
+from micktrace import MickTracer
 
 # Automatic environment variable support
 os.environ["MICKTRACE_LEVEL"] = "DEBUG"
 os.environ["MICKTRACE_FORMAT"] = "json"
 
 # Configuration picks up environment variables automatically
-micktrace.configure(
-    service=os.getenv("SERVICE_NAME", "my-app"),
+# You can still override them in the constructor
+tracer = MickTracer(
+    service_name=os.getenv("SERVICE_NAME", "my-app"),
     environment=os.getenv("ENVIRONMENT", "development")
 )
 ```
 
 ### **Dynamic Configuration**
 ```python
-import micktrace
+from micktrace import MickTracer
+
+# Initialize the tracer
+tracer = MickTracer(level="INFO")
+logger = tracer.get_logger("config")
 
 # Hot-reload configuration without restart
 def update_log_level(new_level: str):
-    micktrace.configure(level=new_level)
-    logger = micktrace.get_logger("config")
+    tracer.configure(level=new_level)
     logger.info("Log level updated", new_level=new_level)
 
 # Change configuration at runtime
 update_log_level("DEBUG")  # Now debug logs will appear
+logger.debug("This is a debug message.")
 update_log_level("ERROR")  # Now only errors will appear
+logger.info("This info message will not be shown.")
 ```
 
 ### **Custom Formatters**
 ```python
-import micktrace
+from micktrace import MickTracer
 from micktrace.formatters import Formatter
 
 class CustomFormatter(Formatter):
     def format(self, record):
         return f"[{record.level.name}] {record.timestamp} | {record.message} | {record.data}"
 
-micktrace.configure(
+tracer = MickTracer(
     level="INFO",
     handlers=[{
         "type": "console",
@@ -767,10 +781,10 @@ micktrace.configure(
 
 ### **Filtering and Sampling**
 ```python
-import micktrace
+from micktrace import MickTracer
 
 # Sample only 10% of debug logs to reduce volume
-micktrace.configure(
+tracer = MickTracer(
     level="DEBUG",
     handlers=[{
         "type": "console",
@@ -788,36 +802,45 @@ micktrace.configure(
 
 ### **Testing Support**
 ```python
-import micktrace
+from micktrace import MickTracer
 import pytest  # pytest: https://pytest.org/
 
+def my_function_that_logs(tracer: MickTracer):
+    logger = tracer.get_logger("my_function")
+    logger.info("Function started")
+    logger.warning("Something might be wrong")
+
 def test_my_function():
+    # Initialize a tracer for testing
+    test_tracer = MickTracer()
+    
     # Capture logs during testing
-    with micktrace.testing.capture_logs() as captured:
-        my_function_that_logs()
+    with test_tracer.testing.capture_logs() as captured:
+        my_function_that_logs(test_tracer)
         
         # Assert log content
         assert len(captured.records) == 2
         assert captured.records[0].message == "Function started"
-        assert captured.records[1].level == micktrace.LogLevel.INFO
+        assert captured.records[1].level.name == "WARNING"
 
 def test_with_context():
+    test_tracer = MickTracer()
+    logger = test_tracer.get_logger("test")
+    
     # Test context propagation
-    with micktrace.context(test_id="test_123"):
-        logger = micktrace.get_logger("test")
+    with test_tracer.span(name="test_span", attributes={"test_id": "test_123"}) as span:
         logger.info("Test message")
         
-        # Context is available
-        ctx = micktrace.get_context()
-        assert ctx["test_id"] == "test_123"
+        # Context is available on the span
+        assert span.context.attributes["test_id"] == "test_123"
 ```
 
 ### **Development Configuration**
 ```python
-import micktrace
+from micktrace import MickTracer
 
 # Rich console output for development
-micktrace.configure(
+tracer = MickTracer(
     level="DEBUG",
     format="rich",  # Beautiful console output
     handlers=[{
@@ -877,9 +900,10 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# After (MickTrace) - Just change the import!
-import micktrace
-logger = micktrace.get_logger(__name__)
+# After (MickTrace) - Just change the import and initialize a tracer
+from micktrace import MickTracer
+tracer = MickTracer()
+logger = tracer.get_logger(__name__)
 # Everything else works the same, but 10x better
 ```
 
@@ -889,9 +913,9 @@ logger = micktrace.get_logger(__name__)
 from loguru import logger
 
 # After (MickTrace) - Same simplicity, more features
-import micktrace  
-logger = micktrace.get_logger(__name__)
-micktrace.configure(level="INFO", format="structured")
+from micktrace import MickTracer
+tracer = MickTracer(level="INFO", format="rich") # Use rich format for similar dev experience
+logger = tracer.get_logger(__name__)
 ```
 
 ### **From Structlog**
@@ -904,9 +928,10 @@ structlog.configure(
     wrapper_class=...,
 )
 
-# After (MickTrace) - Zero setup
-import micktrace
-logger = micktrace.get_logger(__name__)  # Structured by default!
+# After (MickTrace) - Zero setup, structured by default
+from micktrace import MickTracer
+tracer = MickTracer(format="json") # Explicitly JSON for structured logging
+logger = tracer.get_logger(__name__)
 ```
 
 ---

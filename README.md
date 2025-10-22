@@ -12,7 +12,26 @@ MickTrace is the world's most advanced and high-performance Python logging libra
 > **🎯 Stop fighting with logging. Start building great software.**  
 > MickTrace delivers **zero-configuration perfection** for libraries and **infinite customization** for applications.
 
+<br>
 
+## 📚 Table of Contents
+- [🚀 Why Choose MickTrace?](#-why-choose-micktrace)
+- [🏆 Why MickTrace is the Definitive Choice](#-why-micktrace-is-the-definitive-choice)
+- [📦 Installation](#-installation)
+- [⚡ Quick Start](#-quick-start)
+- [📊 Performance Benchmarks](#-performance-benchmarks---micktrace-dominates)
+- [🌟 Key Features](#-key-features)
+- [🏢 Cloud Platform Integration](#-cloud-platform-integration)
+- [📈 Analytics & Monitoring Integration](#-analytics--monitoring-integration)
+- [🎯 Use Cases](#-use-cases)
+- [🔧 Advanced Configuration](#-advanced-configuration)
+- [🧪 Testing and Development](#-testing-and-development)
+- [📊 Performance Characteristics](#-performance-characteristics)
+- [🚀 Migration Guide](#-migration-guide---switch-in-minutes)
+- [🤝 Contributing](#-contributing)
+- [📄 License](#-license)
+- [🔗 Links](#-links)
+- [🤝 Acknowledgments & Integrations](#-acknowledgments--integrations)
 
 **Created by [Ajay Agrawal](https://github.com/ajayagrawalgit) | [LinkedIn](https://www.linkedin.com/in/theajayagrawal/)**
 

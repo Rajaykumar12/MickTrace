@@ -460,35 +460,99 @@ logger.info("Search query", query="python logging", results=1250, response_time_
 ## 🎯 Use Cases
 
 ### **Web Applications**
+
+MickTrace is perfect for web applications, providing structured, context-rich logs for every request with minimal setup.
+
+#### **Flask Example**
+The following example shows how to use a context manager to automatically add request information to all logs within a Flask view.
+
 ```python
 import micktrace
-from flask import Flask, request  # Flask: https://flask.palletsprojects.com/
+from flask import Flask, request
 
 app = Flask(__name__)
 
-# Configure structured logging
-micktrace.configure(
-    level="INFO",
-    format="json",
-    service="web-api",
-    handlers=[{"type": "console"}, {"type": "file", "config": {"path": "api.log"}}]
-)
+micktrace.configure(level="INFO", format="json", service="flask-api")
 
 @app.route("/api/users", methods=["POST"])
 def create_user():
+    # Use a context to automatically add request details to logs
     with micktrace.context(
         request_id=request.headers.get("X-Request-ID"),
         endpoint="/api/users",
         method="POST"
     ):
-        logger = micktrace.get_logger("api")
-        logger.info("User creation started")
+        logger = micktrace.get_logger("api.users")
+        logger.info("User creation request received")
         
-        # Your business logic here
-        user_id = create_user_in_db()
+        # ... business logic to create user ...
+        user_id = 99
         
         logger.info("User created successfully", user_id=user_id)
-        return {"user_id": user_id}
+        return {"status": "success", "user_id": user_id}
+```
+**Example Log Output:**
+```json
+{"timestamp": "2025-10-22T10:30:15.123Z", "level": "INFO", "message": "User creation request received", "logger": "api.users", "service": "flask-api", "request_id": "xyz-789", "endpoint": "/api/users", "method": "POST"}
+{"timestamp": "2025-10-22T10:30:15.234Z", "level": "INFO", "message": "User created successfully", "logger": "api.users", "service": "flask-api", "request_id": "xyz-789", "endpoint": "/api/users", "method": "POST", "user_id": 99}
+```
+
+#### **FastAPI Example**
+For async frameworks like FastAPI, middleware is the most efficient way to trace all incoming requests automatically.
+
+```python
+import micktrace
+from fastapi import FastAPI, Request
+
+app = FastAPI()
+micktrace.configure(level="INFO", format="json", service="fastapi-service")
+logger = micktrace.get_logger("fastapi.middleware")
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    # Automatically trace every request with a context
+    async with micktrace.acontext(path=request.url.path, method=request.method):
+        logger.info("Request started")
+        response = await call_next(request)
+        logger.info("Request finished", status_code=response.status_code)
+        return response
+
+@app.get("/items/{item_id}")
+async def read_item(item_id: int):
+    return {"item_id": item_id}
+```
+**Example Log Output (for a request to `/items/42`):**
+```json
+{"timestamp": "2025-10-22T10:31:05.500Z", "level": "INFO", "message": "Request started", "logger": "fastapi.middleware", "service": "fastapi-service", "path": "/items/42", "method": "GET"}
+{"timestamp": "2025-10-22T10:31:05.550Z", "level": "INFO", "message": "Request finished", "logger": "fastapi.middleware", "service": "fastapi-service", "path": "/items/42", "method": "GET", "status_code": 200}
+```
+
+#### **Django Example**
+A simple Django middleware can provide automatic, structured logging for the entire application without modifying individual views.
+
+```python
+# In myproject/middleware.py
+import micktrace
+
+micktrace.configure(level="INFO", format="json", service="django-app")
+logger = micktrace.get_logger("django.request")
+
+class MickTraceLoggingMiddleware:
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        # Bind request info to the context for all subsequent logs
+        with micktrace.context(path=request.path, method=request.method):
+            logger.info("Request processing started")
+            response = self.get_response(request)
+            logger.info("Request processing finished", status_code=response.status_code)
+            return response
+```
+**Example Log Output (for a request to `/admin/`):**
+```json
+{"timestamp": "2025-10-22T10:32:10.800Z", "level": "INFO", "message": "Request processing started", "logger": "django.request", "service": "django-app", "path": "/admin/", "method": "GET"}
+{"timestamp": "2025-10-22T10:32:10.950Z", "level": "INFO", "message": "Request processing finished", "logger": "django.request", "service": "django-app", "path": "/admin/", "method": "GET", "status_code": 302}
 ```
 
 ### **Microservices**
